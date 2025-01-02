@@ -1,10 +1,11 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
 
 public class CurveVisualizer extends JPanel {
-    private final List<VertFileReader.CurveComponent> components;
+    private List<VertFileReader.CurveComponent> components;
 
     private double scale = 50.0; // 初期拡大率
     private int offsetX = 400;   // X方向の平行移動
@@ -15,9 +16,18 @@ public class CurveVisualizer extends JPanel {
     private boolean isDragging = false; // ドラッグ中かどうかを判定
     private int selectedVertexIndex = -1; // 選択された頂点のインデックス
     private int selectedComponentIndex = -1; // 選択されたコンポーネントのインデックス
+    private double selectedCurvature = 0.0;  // 選択された点の離散曲率
+
+    private Timer evolutionTimer; // 曲率フローの進化用タイマー
 
     public CurveVisualizer(List<VertFileReader.CurveComponent> components) {
         this.components = components;
+
+        // 曲率フローの進化をタイマーで処理
+        evolutionTimer = new Timer(100, e -> {
+            applyCurvatureFlow();
+            repaint();
+        });
 
         // マウスホイールでズームを処理
         addMouseWheelListener(e -> {
@@ -65,7 +75,7 @@ public class CurveVisualizer extends JPanel {
             }
         });
 
-        // キーボードで回転を処理
+        // キーボードで回転や進化の切り替えを処理
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
@@ -73,6 +83,12 @@ public class CurveVisualizer extends JPanel {
                     rotationAngle -= Math.toRadians(5); // 左回転
                 } else if (e.getKeyCode() == KeyEvent.VK_RIGHT) {
                     rotationAngle += Math.toRadians(5); // 右回転
+                } else if (e.getKeyCode() == KeyEvent.VK_SPACE) { // スペースキーで進化の切り替え
+                    if (evolutionTimer.isRunning()) {
+                        evolutionTimer.stop();
+                    } else {
+                        evolutionTimer.start();
+                    }
                 }
                 repaint();
             }
@@ -140,6 +156,10 @@ public class CurveVisualizer extends JPanel {
             int nx = (int) (x + normal[0] * scale);
             int ny = (int) (y + normal[1] * scale);
             drawArrow(g2d, x, y, nx, ny);
+
+            // 離散曲率を描画（画面上部に表示）
+            g2d.setColor(Color.BLACK);
+            g2d.drawString(String.format("Curvature: %.5f", selectedCurvature), 10, 20);
         }
     }
 
@@ -193,7 +213,62 @@ public class CurveVisualizer extends JPanel {
             }
         }
 
+        // 離散曲率を計算
+        if (selectedVertexIndex >= 0 && selectedComponentIndex >= 0) {
+            VertFileReader.CurveComponent component = components.get(selectedComponentIndex);
+            List<double[]> vertices = component.vertices;
+
+            selectedCurvature = computeDiscreteCurvature(vertices, selectedVertexIndex);
+        }
+
         repaint();
+    }
+
+    // 離散曲率を計算
+    private double computeDiscreteCurvature(List<double[]> vertices, int index) {
+        int n = vertices.size();
+        double[] A = vertices.get((index - 1 + n) % n); // 前の点
+        double[] B = vertices.get(index);               // 現在の点
+        double[] C = vertices.get((index + 1) % n);     // 次の点
+
+        double AB = Math.sqrt(Math.pow(B[0] - A[0], 2) + Math.pow(B[1] - A[1], 2));
+        double BC = Math.sqrt(Math.pow(C[0] - B[0], 2) + Math.pow(C[1] - B[1], 2));
+        double CA = Math.sqrt(Math.pow(C[0] - A[0], 2) + Math.pow(C[1] - A[1], 2));
+
+        double s = (AB + BC + CA) / 2.0;
+        double area = Math.sqrt(s * (s - AB) * (s - BC) * (s - CA));
+
+        if (area == 0) return 0.0; // 面積が0の場合の回避
+
+        return (4 * area) / (AB * BC * CA);
+    }
+
+    private void applyCurvatureFlow() {
+        double deltaT = 0.01; // 時間ステップ
+
+        for (VertFileReader.CurveComponent component : components) {
+            List<double[]> vertices = component.vertices;
+            List<double[]> newVertices = new ArrayList<>();
+
+            // 接線と法線を計算
+            List<double[]> tangents = CurveAnalysis.computeTangents(vertices);
+            List<double[]> normals = CurveAnalysis.computeNormals(tangents);
+            List<Double> curvatures = CurveAnalysis.computeCurvatures(vertices);
+
+            for (int i = 0; i < vertices.size(); i++) {
+                double[] vertex = vertices.get(i);
+                double[] normal = normals.get(i);
+                double curvature = curvatures.get(i);
+
+                // 曲率フローによる更新
+                double newX = vertex[0] - deltaT * curvature * normal[0];
+                double newY = vertex[1] - deltaT * curvature * normal[1];
+                newVertices.add(new double[]{newX, newY});
+            }
+
+            // 更新した頂点リストを反映
+            component.vertices = newVertices;
+        }
     }
 
     public static void main(String[] args) {
@@ -201,7 +276,7 @@ public class CurveVisualizer extends JPanel {
             String filePath = "./vert/riderr.vert";
             List<VertFileReader.CurveComponent> components = VertFileReader.loadVertFile(filePath);
 
-            JFrame frame = new JFrame("Curve Visualizer with Drag and Rotate");
+            JFrame frame = new JFrame("Curve Visualizer with Curvature Flow");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setSize(800, 800);
             frame.add(new CurveVisualizer(components));
