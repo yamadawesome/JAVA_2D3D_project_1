@@ -15,3 +15,5 @@ java CurveVisualizer
 -Image Scaling: mouse wheel operation
 
 -Image Rotation: " <- " , " -> " key
+
+-Changing Curvature: press space key
