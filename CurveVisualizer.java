@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.AffineTransform;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
@@ -97,6 +98,7 @@ public class CurveVisualizer extends JPanel {
         setFocusable(true); // キーイベントを受け取るために必要
     }
 
+    
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -156,12 +158,18 @@ public class CurveVisualizer extends JPanel {
             int nx = (int) (x + normal[0] * scale);
             int ny = (int) (y + normal[1] * scale);
             drawArrow(g2d, x, y, nx, ny);
-
-            // 離散曲率を描画（画面上部に表示）
-            g2d.setColor(Color.BLACK);
-            g2d.drawString(String.format("Curvature: %.5f", selectedCurvature), 10, 20);
         }
+
+        // **画面固定文字の描画**（回転処理の影響を受けない）
+        g2d.setTransform(new AffineTransform()); // 描画状態をリセット
+
+        Font largeFont = new Font("SansSerif", Font.BOLD, 30); // フォントスタイルとサイズ
+        g2d.setFont(largeFont);
+        g2d.setColor(Color.BLACK);
+        g2d.drawString(String.format("Curvature: %.5f", selectedCurvature), 10, 20); // 画面左上に固定
     }
+
+
 
     private void drawArrow(Graphics2D g2d, int x1, int y1, int x2, int y2) {
         g2d.drawLine(x1, y1, x2, y2);
