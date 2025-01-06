@@ -10,13 +10,13 @@ javac CurveVisualizer.java CurveAnalysis.java VertFileReader.java
 java CurveVisualizer
 
 **GUI Operation**
--Display of normal and tangent vectors at a vertex: click on a vertex on the displayed image
+  -Display of normal and tangent vectors at a vertex: click on a vertex on the displayed image
 
--Image Scaling: mouse wheel operation
+  -Image Scaling: mouse wheel operation
 
--Image Rotation: " <- " , " -> " key
+  -Image Rotation: " <- " , " -> " key
 
--Changing Curvature: press space key
+  -Changing Curvature: press space key
 
 **References**
 https://docs.oracle.com/javase/jp/8/docs/api/java/awt/event/MouseEvent.html
